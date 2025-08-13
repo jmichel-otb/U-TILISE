@@ -14,57 +14,61 @@ from lib.visutils import COLORMAPS
 
 
 class Method(Enum):
-    UTILISE = 'utilise'
-    TRIVIAL = 'trivial'
+    UTILISE = "utilise"
+    TRIVIAL = "trivial"
 
-    
+
 class Mode(Enum):
-    LAST = 'last'
-    NEXT = 'next'
-    CLOSEST = 'closest'
-    LINEAR_INTERPOLATION = 'linear_interpolation'
+    LAST = "last"
+    NEXT = "next"
+    CLOSEST = "closest"
+    LINEAR_INTERPOLATION = "linear_interpolation"
     NONE = None
 
 
 class Imputation:
     def __init__(
-            self,
-            config_file_train: str | None,
-            method: Literal['utilise', 'trivial'] = 'utilise',
-            mode: Literal['last', 'next', 'closest', 'linear_interpolation'] | None = None,
-            checkpoint: str | None = None
+        self,
+        config_file_train: str | None,
+        method: Literal["utilise", "trivial"] = "utilise",
+        mode: Literal["last", "next", "closest", "linear_interpolation"] | None = None,
+        checkpoint: str | None = None,
     ):
-        
         self.method = Method(method)
         self.mode = Mode(mode)
         self.checkpoint = checkpoint
         self.config_file_train = config_file_train
 
         if self.method == Method.TRIVIAL and self.mode == Mode.NONE:
-            raise ValueError(f'No mode specified. Choose among {[mode.value for mode in Mode]}.')
-        
+            raise ValueError(
+                f"No mode specified. Choose among {[mode.value for mode in Mode]}."
+            )
+
         if self.method == Method.UTILISE:
             if self.checkpoint is None:
-                raise ValueError('No checkpoint specified.\n')
-                
+                raise ValueError("No checkpoint specified.\n")
+
             if self.config_file_train is None:
-                raise ValueError('No training configuration file specified.\n')
-            
+                raise ValueError("No training configuration file specified.\n")
+
             if not os.path.isfile(self.config_file_train):
-                raise FileNotFoundError(f'Cannot find the configuration file used during training: {self.config_file_train}\n')
+                raise FileNotFoundError(
+                    f"Cannot find the configuration file used during training: {self.config_file_train}\n"
+                )
 
             if not os.path.isfile(self.checkpoint):
-                raise FileNotFoundError(f'Cannot find the model weights: {self.checkpoint}\n')
-                
+                raise FileNotFoundError(
+                    f"Cannot find the model weights: {self.checkpoint}\n"
+                )
+
             # Read the configuration file used during training
             self.config = config_utils.read_config(self.config_file_train)
 
             # Extract the temporal window size and the number of channels used during training
             self.temporal_window = self.config.data.max_seq_length
-            self.num_channels = data_utils.get_dataset(self.config, phase=self.config.misc.run_mode).num_channels
-        
+            self.num_channels = 4  # data_utils.get_dataset(self.config, phase=self.config.misc.run_mode).num_channels
 
-        self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         _ = torch.set_grad_enabled(False)
 
         # Get the model
@@ -73,56 +77,61 @@ class Imputation:
             self._resume()
             self.model.to(self.device).eval()
         else:
-            self.model = MODELS['ImageSeriesInterpolator'](mode=self.mode.value)
+            self.model = MODELS["ImageSeriesInterpolator"](mode=self.mode.value)
 
     def impute_sample(
-            self,
-            batch: Dict[str, Any],
-            t_start: Optional[int] = None,
-            t_end: Optional[int] = None,
-            return_att: Optional[bool] = False
+        self,
+        batch: Dict[str, Any],
+        t_start: Optional[int] = None,
+        t_end: Optional[int] = None,
+        return_att: Optional[bool] = False,
     ) -> Tuple[Dict[str, Any], Tensor, Tensor] | Tuple[Dict[str, Any], Tensor]:
-
         if t_start is not None and t_end is not None:
             # Choose a subsequence
-            batch['x'] = batch['x'][:, t_start:t_end, ...]
-            
-            for key in ['y', 'masks', 'cloud_mask', 'masks_valid_obs']:
+            batch["x"] = batch["x"][:, t_start:t_end, ...]
+
+            for key in ["y", "masks", "cloud_mask", "masks_valid_obs"]:
                 if key in batch:
                     batch[key] = batch[key][:, t_start:t_end, ...]
-                    
-            for key in ['days', 'position_days']:
+
+            for key in ["days", "position_days"]:
                 if key in batch:
                     batch[key] = batch[key][:, t_start:t_end]
 
         # Impute the given satellite image time series
-        if isinstance(self.model, MODELS['utilise']):
+        if isinstance(self.model, MODELS["utilise"]):
             batch = data_utils.to_device(batch, self.device)
             if return_att:
-                y_pred, att = impute_sequence(self.model, batch, self.temporal_window, return_att=True)
+                y_pred, att = impute_sequence(
+                    self.model, batch, self.temporal_window, return_att=True
+                )
                 if att is not None:
                     att = att.cpu()
             else:
-                y_pred = impute_sequence(self.model, batch, self.temporal_window, return_att=False)
-            batch = data_utils.to_device(batch, 'cpu')
+                y_pred = impute_sequence(
+                    self.model, batch, self.temporal_window, return_att=False
+                )
+            batch = data_utils.to_device(batch, "cpu")
             y_pred = y_pred.cpu()
         else:
-            y_pred = self.model(batch['x'], cloud_mask=batch['masks'], days=batch['days'])
+            y_pred = self.model(
+                batch["x"], cloud_mask=batch["masks"], days=batch["days"]
+            )
 
         if return_att:
             return batch, y_pred, att
         return batch, y_pred
 
     def _resume(self) -> None:
-        checkpoint = torch.load(self.checkpoint)
-        self.model.load_state_dict(checkpoint['model_state_dict'])
-        print(f'Checkpoint \'{self.checkpoint}\' loaded.')
+        checkpoint = torch.load(self.checkpoint, map_location=self.device)
+        self.model.load_state_dict(checkpoint["model_state_dict"])
+        print(f"Checkpoint '{self.checkpoint}' loaded.")
         print(f"Chosen epoch: {checkpoint['epoch']}\n")
         del checkpoint
 
 
 def impute_sequence(
-        model, batch: Dict[str, Any], temporal_window: int, return_att: bool = False
+    model, batch: Dict[str, Any], temporal_window: int, return_att: bool = False
 ) -> Tensor | Tuple[Tensor, Tensor]:
     """
     Sliding-window imputation of satellite image time series.
