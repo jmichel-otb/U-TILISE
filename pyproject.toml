@@ -4,7 +4,7 @@ name = "lib"
 requires-python = ">= 3.10"
 version = "0.1.0"
 license = "MIT"
-dependencies = ["setuptools", "prodict>=0.8.20,<0.9", "torchgeometry>=0.1.2,<0.2", "nestargs>=1.1.0,<2", "tensorboard>=2.20.0,<3", "kornia>=0.7.1,<0.8"]
+dependencies = ["setuptools", "prodict>=0.8.20,<0.9", "torchgeometry>=0.1.2,<0.2", "nestargs>=1.1.0,<2", "tensorboard>=2.20.0,<3", "kornia>=0.7.1,<0.8", "torchinfo>=1.8.0,<2"]
 
 [build-system]
 build-backend = "hatchling.build"
@@ -28,6 +28,5 @@ h5py = ">=3.9.0,<4"
 matplotlib = ">=3.9.1,<4"
 numba = ">=0.59.1,<0.60"
 omegaconf = ">=2.3.0,<3"
-torchinfo = ">=1.8.0,<2"
 tqdm = ">=4.67.1,<5"
 wandb = ">=0.21.0,<0.22"
