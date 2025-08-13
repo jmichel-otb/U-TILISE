@@ -10,6 +10,9 @@ dependencies = ["setuptools", "prodict>=0.8.20,<0.9", "torchgeometry>=0.1.2,<0.2
 build-backend = "hatchling.build"
 requires = ["hatchling"]
 
+[tool.hatch.build.targets.wheel]
+packages = ["lib"]
+
 [tool.pixi.workspace]
 channels = ["nvidia/label/cuda-11.8.0", "nvidia", "pytorch", "conda-forge"]
 platforms = ["linux-64"]
